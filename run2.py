@@ -18,7 +18,8 @@ from agents.risk_agent.overall_risk import create_risk_analyst_agent
 from agents.portfolio_manager_agent.portfolio_agent import create_portfolio_manager_agent
 import json
 import functools
-
+from stream import LangSmithStreamingWrapper, stream_langraph_workflow
+from reflection.reflection import TradingReflectionSystem, simulate_trading_outcome, quick_reflection
 console = Console()
 
 class CompleteTradingWorkflow:
@@ -585,37 +586,216 @@ class CompleteTradingWorkflow:
         return final_state
 
 # Usage function
+# Update your existing complete_trading_workflow.py file
+
+# Add this import at the top with your other imports:
+from reflection.reflection import TradingReflectionSystem, simulate_trading_outcome, quick_reflection
+
+# Update your main function to include reflection:
+
 def main():
-    """Main function to run complete trading workflow"""
+    """Main function to run complete trading workflow with optional streaming and reflection"""
     workflow = CompleteTradingWorkflow()
     
     # Use past date to avoid data issues
     TRADE_DATE = (datetime.date.today() - datetime.timedelta(days=0)).strftime('%Y-%m-%d')
-    final_state = workflow.run_analysis("META", TRADE_DATE)
     
-    # Serialize state for saving
-    serializable_state = final_state.copy()
-    if 'messages' in serializable_state:
-        serializable_state['messages'] = [
-            {
-                'type': msg.__class__.__name__,
-                'content': msg.content
-            } for msg in serializable_state['messages']
-        ]
+    # Toggle between streaming and regular execution
+    USE_STREAMING = True  # Set to False for regular execution
+    USE_REFLECTION = True  # Set to False to skip learning process
+    
+    if USE_STREAMING:
+        console.print("[bold yellow]📡 Using LangSmith Streaming Mode[/bold yellow]")
+        
+        # Create initial state
+        initial_state = {
+            "messages": [HumanMessage(content=f"Complete trading analysis for META on {TRADE_DATE}")],
+            "company_of_interest": "META",
+            "trade_date": TRADE_DATE,
+            "market_report": "",
+            "sentiment_report": "",
+            "news_report": "",
+            "fundamentals_report": "",
+            "investment_plan": "",
+            "trader_investment_plan": "",
+            "final_trade_decision": "",
+            "sender": "user",
+            "investment_debate_state": InvestDebateState({
+                'history': '',
+                'current_response': '',
+                'count': 0,
+                'bull_history': '',
+                'bear_history': '',
+                'judge_decision': ''
+            }),
+            "risk_debate_state": RiskDebateState({
+                'history': '',
+                'latest_speaker': '',
+                'current_risky_response': '',
+                'current_safe_response': '',
+                'current_neutral_response': '',
+                'count': 0,
+                'risky_history': '',
+                'safe_history': '',
+                'neutral_history': '',
+                'judge_decision': ''
+            })
+        }
+        
+        # Configure streaming
+        config = {
+            "recursion_limit": 50,
+            "configurable": {
+                "session_id": f"trading-META-{TRADE_DATE}",
+                "user_id": "trading-system",
+            }
+        }
+        
+        # Option 1: Using the wrapper class
+        streaming_wrapper = LangSmithStreamingWrapper(workflow)
+        final_state = streaming_wrapper.stream_workflow(
+            initial_state, 
+            config,
+            save_results=True,
+            filename_prefix="complete_trading_streaming"
+        )
+        
+        # Display LangSmith info
+        streaming_wrapper.display_langsmith_info()
+        
+        # Get execution stats
+        stats = streaming_wrapper.get_execution_stats()
+        console.print(f"\n[bold green]Execution completed in {stats.get('total_time', 0):.2f}s[/bold green]")
+        
+    else:
+        console.print("[bold blue]⚡ Using Regular Execution Mode[/bold blue]")
+        final_state = workflow.run_analysis("META", TRADE_DATE)
+        
+        # Save regular results
+        if final_state:
+            serializable_state = final_state.copy()
+            if 'messages' in serializable_state:
+                serializable_state['messages'] = [
+                    {
+                        'type': msg.__class__.__name__,
+                        'content': msg.content
+                    } for msg in serializable_state['messages']
+                ]
 
-    with open("complete_final_state.json", "w") as f:
-        json.dump(serializable_state, f, indent=2)
+            with open("complete_final_state_regular.json", "w") as f:
+                json.dump(serializable_state, f, indent=2)
     
-    console.print(f"\n[bold green]📊 WORKFLOW SUMMARY:[/bold green]")
-    console.print(f"Company Analyzed: {final_state['company_of_interest']}")
-    console.print(f"Analysis Date: {final_state['trade_date']}")
-    console.print(f"Investment Plan: {'✅ Available' if final_state.get('investment_plan') else '❌ Missing'}")
-    console.print(f"Trading Proposal: {'✅ Available' if final_state.get('trader_investment_plan') else '❌ Missing'}")
-    console.print(f"Final Decision: {'✅ Available' if final_state.get('final_trade_decision') else '❌ Missing'}")
-    console.print(f"Investment Debate Rounds: {final_state['investment_debate_state']['count']}")
-    console.print(f"Risk Debate Rounds: {final_state['risk_debate_state']['count'] // 3}")
+    # Display final summary (works for both modes)
+    if final_state:
+        console.print(f"\n[bold green]📊 WORKFLOW SUMMARY:[/bold green]")
+        console.print(f"Company Analyzed: {final_state.get('company_of_interest', 'Unknown')}")
+        console.print(f"Analysis Date: {final_state.get('trade_date', 'Unknown')}")
+        console.print(f"Investment Plan: {'✅ Available' if final_state.get('investment_plan') else '❌ Missing'}")
+        console.print(f"Trading Proposal: {'✅ Available' if final_state.get('trader_investment_plan') else '❌ Missing'}")
+        console.print(f"Final Decision: {'✅ Available' if final_state.get('final_trade_decision') else '❌ Missing'}")
+        
+        # Safe access to debate states
+        investment_debate = final_state.get('investment_debate_state', {})
+        risk_debate = final_state.get('risk_debate_state', {})
+        
+        console.print(f"Investment Debate Rounds: {investment_debate.get('count', 0)}")
+        console.print(f"Risk Debate Rounds: {risk_debate.get('count', 0) // 3}")
+        
+        # NEW: Add reflection and learning
+        if USE_REFLECTION:
+            console.print("\n" + "="*80)
+            console.print("[bold magenta]🧠 STARTING LEARNING PROCESS[/bold magenta]")
+            console.print("="*80)
+            
+            # Option 1: Simulate outcome for testing
+            reflection_results = simulate_trading_outcome(
+                final_state, 
+                hypothetical_returns=1250.0,  # Simulate $1,250 profit
+                outcome_description="Stock price increased 8% over the following week due to positive earnings surprise and upgraded analyst ratings"
+            )
+            
+            console.print(f"[bold green]🎓 Learning completed! All agents have been updated with new insights.[/bold green]")
     
     return final_state
 
+# Alternative: Manual reflection with real outcomes
+def main_with_real_outcome():
+    """Example of using real trading outcomes for reflection"""
+    workflow = CompleteTradingWorkflow()
+    TRADE_DATE = (datetime.date.today() - datetime.timedelta(days=0)).strftime('%Y-%m-%d')
+    
+    # Run analysis
+    final_state = workflow.run_analysis("META", TRADE_DATE)
+    
+    if final_state:
+        # In real implementation, you would get actual returns from your trading system
+        console.print("\n[bold cyan]💰 Waiting for actual trading outcome...[/bold cyan]")
+        
+        # Example: You would replace this with actual outcome data
+        actual_returns = 850.0  # Real profit/loss from your trading system
+        outcome_description = "Trade executed at market open. Stock gapped up on earnings beat, closed 5.2% higher."
+        
+        # Run reflection with real outcome
+        reflection_system = TradingReflectionSystem()
+        reflection_results = reflection_system.process_trading_outcome(
+            final_state, 
+            actual_returns, 
+            outcome_description,
+            save_reflection=True
+        )
+        
+        console.print(f"[bold green]Real outcome reflection completed![/bold green]")
+        return final_state, reflection_results
+    
+    return final_state, None
+
+# Batch reflection example
+def run_batch_reflection():
+    """Example of running reflection on multiple past trades"""
+    workflow = CompleteTradingWorkflow()
+    
+    # Example: Multiple scenarios for testing
+    test_scenarios = [
+        {
+            "ticker": "AAPL", 
+            "returns": -450.0, 
+            "description": "Stock dropped after disappointing guidance, despite beating earnings"
+        },
+        {
+            "ticker": "GOOGL", 
+            "returns": 1200.0, 
+            "description": "Strong rally on AI product announcements and cost-cutting measures"
+        },
+        {
+            "ticker": "TSLA", 
+            "returns": 0.0, 
+            "description": "Sideways movement despite volatile intraday action"
+        }
+    ]
+    
+    reflection_results = []
+    
+    for scenario in test_scenarios:
+        console.print(f"\n[bold yellow]Running analysis for {scenario['ticker']}...[/bold yellow]")
+        
+        # Run workflow
+        final_state = workflow.run_analysis(scenario['ticker'])
+        
+        # Run reflection
+        if final_state:
+            results = simulate_trading_outcome(
+                final_state,
+                scenario['returns'],
+                scenario['description']
+            )
+            reflection_results.append(results)
+    
+    console.print(f"\n[bold green]Batch reflection completed for {len(reflection_results)} trades![/bold green]")
+    return reflection_results
+
 if __name__ == "__main__":
     final_state = main()
+    
+    # Alternative usage:
+    # final_state, reflection_results = main_with_real_outcome()
+    # batch_results = run_batch_reflection()
