@@ -676,10 +676,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## �� **Contact Information**
 
-- **Project Maintainer**: [Your Name]
-- **Email**: [your.email@example.com]
-- **GitHub**: [your-github-username]
-- **LinkedIn**: [your-linkedin-profile]
+- **Project Maintainer**: [Tejpal Kumawat]
+- **Email**: [tejpaliitb782@gmail.com]
+- **GitHub**: [tejpal123456789]
+- **LinkedIn**: [https://www.linkedin.com/in/tejpal-kumawat-722a061a9/]
 
 ---
 
