@@ -47,6 +47,9 @@ trading/
 └── 📄 llm.py                       # Language model configuration
 ```
 
+## Workflow Overview
+![Trading Workflow](trader_workflow.png)
+
 ---
 
 ## 🤖 **Agent Ecosystem**

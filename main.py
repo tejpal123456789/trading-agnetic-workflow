@@ -595,7 +595,7 @@ from reflection.reflection import TradingReflectionSystem, simulate_trading_outc
 
 def main():
     """Main function to run complete trading workflow with optional streaming and reflection"""
-    workflow = CompleteTradingWorkflow()
+    workflow = CompleteTradingWorkflow()  
     
     # Use past date to avoid data issues
     TRADE_DATE = (datetime.date.today() - datetime.timedelta(days=0)).strftime('%Y-%m-%d')
